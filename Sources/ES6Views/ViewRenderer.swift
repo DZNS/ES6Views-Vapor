@@ -41,6 +41,12 @@ public class ViewRenderer {
   /// The directory storing all the view files
   internal var viewDirectory: String
   
+  private let jsonEncoder: JSONEncoder = {
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .iso8601
+    return encoder
+  }()
+  
   /// Creates the view renderer
   public init(eventLoop: EventLoop, cache: ViewCache, viewDirectory: String) {
     self.eventLoop = eventLoop
@@ -67,7 +73,7 @@ public class ViewRenderer {
         throw RendererError.unkownLayout(name)
       }
       
-      let json = try JSONSerialization.data(withJSONObject: context)
+      let json = try jsonEncoder.encode(context)
       let jsonString = String(data: json, encoding: .utf8)!
       
       let command = "-O -x \(jsonString) \(filePath)"
@@ -129,8 +135,8 @@ extension ViewRenderer: Vapor.ViewRenderer {
   }
   
   public func render<E:Encodable>(_ name: String, _ context: E) -> EventLoopFuture<Vapor.View> {
-    return self.render(name: name, context: context).map { buffer in
-      return View(data: buffer)
+    self.render(name: name, context: context).map { buffer in
+      View(data: buffer)
     }
   }
 }
