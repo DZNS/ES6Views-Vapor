@@ -71,7 +71,7 @@ public class ViewRenderer {
       let jsonString = String(data: json, encoding: .utf8)!
       
       let command = "-O -x \(jsonString) \(filePath)"
-      let html = try safeShell(["-O", "-x", jsonString, filePath])
+      let html = try safeShell(executable, ["-O", "-x", jsonString, filePath])
       buffer.writeString(html)
       
       return self.eventLoop.makeSucceededFuture(buffer)
@@ -83,7 +83,7 @@ public class ViewRenderer {
   
   // MARK: Internal
   @discardableResult // Add to suppress warnings when you don't want/need a result
-  private func safeShell(_ commands: [String]) throws -> String {
+  private func safeShell(_ launchPath: String, _ commands: [String]) throws -> String {
     let task = Process()
     let outputPipe = Pipe()
     let errorPipe = Pipe()
@@ -91,7 +91,7 @@ public class ViewRenderer {
     task.standardOutput = outputPipe
     task.standardError = errorPipe
     task.arguments = commands
-    task.launchPath = executable
+    task.launchPath = launchPath
     task.standardInput = nil
     task.environment?["PWD"] = viewDirectory
     task.environment?["PATH"] = "/usr/bin:/usr/local/bin"
