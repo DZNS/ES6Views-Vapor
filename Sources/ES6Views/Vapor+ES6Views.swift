@@ -25,7 +25,7 @@ extension Request {
     return .init(
       eventLoop: self.eventLoop,
       cache: self.application.es6views.renderer.cache,
-      viewDirectory: self.application.es6views.renderer.viewDirectory
+      viewDirectory: self.application.directory.viewsDirectory
     )
   }
 }
