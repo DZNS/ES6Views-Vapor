@@ -12,6 +12,8 @@ import Vapor
 
 /// The view renderer for ES6Views
 public class ViewRenderer {
+  let logger = Logger(label: "ES6Views")
+  
   /// A enumeration of possible errors of the view renderer
   public enum RendererError: Error {
     case unkownLayout(String)
@@ -65,6 +67,8 @@ public class ViewRenderer {
   /// - Returns: buffer to render
   public func render(name: String, context: Encodable) -> EventLoopFuture<ByteBuffer> {
     let filePath = name.hasPrefix("/") ? name : [viewDirectory, name].joined(separator: "") + ".es6"
+    
+    logger.info("view directory: \(viewDirectory); final file path: \(filePath)")
     
     var buffer = ByteBufferAllocator().buffer(capacity: 4096)
     
