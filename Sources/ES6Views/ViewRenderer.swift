@@ -11,7 +11,7 @@ import Vapor
 // MARK: - ViewRenderer
 
 /// The view renderer for ES6Views
-public class ViewRenderer {
+public class ES6ViewRenderer {
   let logger = Logger(label: "ES6Views")
   
   /// A enumeration of possible errors of the view renderer
@@ -28,11 +28,6 @@ public class ViewRenderer {
       }
     }
   }
-  
-  /// the path to ES6Views executable
-  ///
-  /// defaults to `/usr/local/bin/es6views`
-  internal var executable: String = "/usr/local/bin/es6views"
   
   /// The event loop the view renderer is running on
   internal var eventLoop: EventLoop
@@ -54,10 +49,6 @@ public class ViewRenderer {
     self.eventLoop = eventLoop
     self.cache = cache
     self.viewDirectory = viewDirectory
-    
-    if let executable = Environment.process.es6views {
-      self.executable = executable
-    }
   }
   
   /// Renders a layout and its context
@@ -65,59 +56,14 @@ public class ViewRenderer {
   ///   - name: the file name
   ///   - context: data to pass to the view
   /// - Returns: buffer to render
-  public func render(name: String, context: Encodable) -> EventLoopFuture<ByteBuffer> {
-    let filePath = name.hasPrefix("/") ? name : [viewDirectory, name].joined(separator: "") + ".es6"
-    
-    logger.info("view directory: \(viewDirectory); final file path: \(filePath)")
-    
+  public func renderView<T: ES6Layout>(view: T.Type, context: Encodable) async throws -> View {
     var buffer = ByteBufferAllocator().buffer(capacity: 4096)
+
+    let view = view.init(renderPartial: nil)
+    try await view.parse()
+    buffer.writeString(view.markup)
     
-    do {
-      guard FileManager.default.fileExists(atPath: filePath) else {
-        throw RendererError.unkownLayout(name)
-      }
-      
-      let json = try jsonEncoder.encode(context)
-      let jsonString = String(data: json, encoding: .utf8)!
-      
-      let command = "-O -x \(jsonString) \(filePath)"
-      let html = try safeShell(executable, ["-O", "-x", jsonString, filePath])
-      buffer.writeString(html)
-      
-      return self.eventLoop.makeSucceededFuture(buffer)
-    }
-    catch {
-      return self.eventLoop.makeFailedFuture(error)
-    }
-  }
-  
-  // MARK: Internal
-  @discardableResult // Add to suppress warnings when you don't want/need a result
-  private func safeShell(_ launchPath: String, _ commands: [String]) throws -> String {
-    let task = Process()
-    let outputPipe = Pipe()
-    let errorPipe = Pipe()
-    
-    task.standardOutput = outputPipe
-    task.standardError = errorPipe
-    task.arguments = commands
-    task.launchPath = launchPath
-    task.standardInput = nil
-    task.environment?["PWD"] = viewDirectory
-    task.environment?["PATH"] = "/usr/bin:/usr/local/bin"
-    
-    try task.run()
-    
-    if let errorData = try? errorPipe.fileHandleForReading.readToEnd(),
-       !errorData.isEmpty,
-       let errorOutput = String(data: errorData, encoding: .utf8) {
-      throw RendererError.commandError(errorOutput.removingTrailingLinebreak())
-    }
-    
-    let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
-    let output = String(data: data, encoding: .utf8)!
-    
-    return output.removingTrailingLinebreak()
+    return View(data: buffer)
   }
 }
 
@@ -132,27 +78,14 @@ private extension String {
   }
 }
 
-// MARK: - Vapor.ViewRenderer
-extension ViewRenderer: Vapor.ViewRenderer {
-  public func `for`(_ request: Request) -> Vapor.ViewRenderer {
-    return request.es6views
-  }
-  
-  public func render<E:Encodable>(_ name: String, _ context: E) -> EventLoopFuture<Vapor.View> {
-    self.render(name: name, context: context).map { buffer in
-      View(data: buffer)
-    }
-  }
-}
-
-extension ViewRenderer.RendererError: AbortError {
+extension ES6ViewRenderer.RendererError: AbortError {
   @_implements(AbortError, reason)
   public var abortReason: String { self.description }
   
   public var status: HTTPResponseStatus { .internalServerError }
 }
 
-extension ViewRenderer.RendererError: DebuggableError {
+extension ES6ViewRenderer.RendererError: DebuggableError {
   @_implements(DebuggableError, reason)
   public var debuggableReason: String { self.description }
 }

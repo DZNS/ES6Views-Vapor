@@ -16,6 +16,11 @@ public class ViewCache {
   /// Name: html contents
   internal var storage: [String: String]
   
+  /// whether the cache is enabled
+  ///
+  /// disabled when running in non-release mode
+  internal var isEnabled: Bool = true
+  
   /// Creates the cache
   internal init() {
     self.storage = [:]
